@@ -73,6 +73,7 @@ spreadsheetservice = gdata.spreadsheet.service.SpreadsheetsService()
 try:
     docsservice.SetClientLoginToken(config.get('googlebackup', 'docstoken'))
     spreadsheetservice.SetClientLoginToken(config.get('googlebackup', 'spreadsheettoken'))
+    docsservice.GetDocumentListFeed().entry
     loginworked = True
 except:
     loginworked = False
@@ -87,6 +88,7 @@ if options.interactive and not loginworked:
         config.set('googlebackup', 'docstoken', docsservice.GetClientLoginToken())
         config.set('googlebackup', 'spreadsheettoken', spreadsheetservice.GetClientLoginToken())
         loginworked = True
+        saveconfig()
     except:
         loginworked = False
 
@@ -96,7 +98,7 @@ if loginworked == False:
         print >> sys.stderr, "You have to run this app interactively at least once to enter username and password and retrieve a valid login token from google."
     sys.exit(-1)
 
-lastrun = datetime.datetime.strptime(config.get('googlebackup', 'lastrun'), '%Y-%m-%dT%H:%M:%S.%f')
+lastrun = datetime.datetime.strptime(config.get('googlebackup', 'lastrun').split('.')[0], '%Y-%m-%dT%H:%M:%S')
 
 alldocuments = docsservice.GetDocumentListFeed().entry
 
@@ -109,6 +111,7 @@ if verbose:
 endings = {
         'document': 'odt',
         'spreadsheet': 'ods',
+        'pdf': 'pdf'
         }
 
 for entry in alldocuments:
@@ -141,27 +144,34 @@ for entry in alldocuments:
     filename = os.path.join(pathdir, hidden + entry.title.text + '.' + ending)
 
 
-    published = datetime.datetime.strptime(entry.published.text, '%Y-%m-%dT%H:%M:%S.%fZ')
-    updated = datetime.datetime.strptime(entry.updated.text, '%Y-%m-%dT%H:%M:%S.%fZ')
+    published = datetime.datetime.strptime(entry.published.text.split('.')[0], '%Y-%m-%dT%H:%M:%S')
+    updated = datetime.datetime.strptime(entry.updated.text.split('.')[0], '%Y-%m-%dT%H:%M:%S')
     if lastrun < updated or not os.path.exists(filename):
         if not options.quiet:
             print " Have to get this file again!"
 
         if not os.path.exists(pathdir):
             os.makedirs(pathdir)
-        if ending is 'ods':
+        if ending is endings['spreadsheet']:
+            #
+            # downloading spreadsheets requires the authentication token from the spreadsheet service.
+            #
             docstoken = docsservice.GetClientLoginToken()
             docsservice.SetClientLoginToken(spreadsheetservice.GetClientLoginToken())
             try:
                 docsservice.Download(entry, filename, ending)
             except Exception, e:
-                print e
-            docsservice.SetClientLoginToken(docstoken)
+                print 'Exception: ', e
+            finally:
+                docsservice.SetClientLoginToken(docstoken)
         else:
+            #
+            # Anything else will just work with the normal docservice auth-token
+            #
             try:
                 docsservice.Download(entry, filename, ending)
             except Exception, e:
-                print e
+                print 'Exception: ', e
         modtime = time.mktime(updated.timetuple())
         os.utime(filename, (int(time.time()), int(modtime)))
 
