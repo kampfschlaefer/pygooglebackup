@@ -55,7 +55,7 @@ parser = optparse.OptionParser(version='%prog 0.1', description=description)
 parser.add_option('', '--debug', help='Add debugging output', default=False)
 parser.add_option('-q', '--quiet', help='Run really quiet. No output apart from important errors (which are sent to stderr).', action='store_true', default=False)
 parser.add_option('-i', '--interactive', help='Run interactively if needed.', dest='interactive', default=True, action='store_true')
-parser.add_option('-n', '--non-interactive', help='Don\'t run interactive. The apps fails if there is no valid login token for google in the config-file.', dest='interactive', action='store_false')
+parser.add_option('-n', '--non-interactive', help='Don\'t run interactive. The apps fails if there is no valid login token for google and no username/passwd in the config-file.', dest='interactive', action='store_false')
 
 options, args = parser.parse_args()
 
@@ -78,10 +78,23 @@ try:
 except:
     loginworked = False
 
-if options.interactive and not loginworked:
-    print "No previous token was found (or could be used). Please enter your google-username and -password to authenticate."
-    username = raw_input('Username: ')
-    passwd = getpass.getpass()
+if not loginworked:
+    username = ''
+    passwd = ''
+    if config.has_option('googlebackup', 'username') and config.has_option('googlebackup', 'passwd'):
+        print 'Using username and passwd from the config-file'
+        username = config.get('googlebackup', 'username')
+        passwd = config.get('googlebackup', 'passwd')
+    elif options.interactive:
+        username = raw_input('Username: ')
+        passwd = getpass.getpass()
+    #else:
+    #    print "No username/passwd in the config-file and a non-interactive session."
+    #    sys.exit(-1)
+    #if options.interactive:
+    #    print "No previous token was found (or could be used). Please enter your google-username and -password to authenticate."
+    #    username = raw_input('Username: ')
+    #    passwd = getpass.getpass()
     try:
         docsservice.ClientLogin(username, passwd, source="Python Google Docs Backup")
         spreadsheetservice.ClientLogin(username, passwd, source="Python Google Docs Backup")
@@ -95,7 +108,8 @@ if options.interactive and not loginworked:
 if loginworked == False:
     print >> sys.stderr, "Login failed!"
     if not options.interactive:
-        print >> sys.stderr, "You have to run this app interactively at least once to enter username and password and retrieve a valid login token from google."
+        print >> sys.stderr, """You have to run this app interactively at least once to enter username and password and retrieve a valid login token from google.
+Or add username and passwd to the configuration file. (Note that these aren't saved in interactive sessions.)"""
     sys.exit(-1)
 
 lastrun = datetime.datetime.strptime(config.get('googlebackup', 'lastrun').split('.')[0], '%Y-%m-%dT%H:%M:%S')
