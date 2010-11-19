@@ -29,6 +29,12 @@ except:
     sys.exit(-1)
 
 
+def downloadfile(service, entry, filename, ending):
+    service.Download(entry, filename, ending)
+    modtime = time.mktime(updated.timetuple())
+    os.utime(filename, (int(time.time()), int(modtime)))
+
+
 config = ConfigParser.SafeConfigParser()
 config.add_section('googlebackup')
 config.set('googlebackup', 'backupdir', '~/googlebackup')
@@ -88,13 +94,7 @@ if not loginworked:
     elif options.interactive:
         username = raw_input('Username: ')
         passwd = getpass.getpass()
-    #else:
-    #    print "No username/passwd in the config-file and a non-interactive session."
-    #    sys.exit(-1)
-    #if options.interactive:
-    #    print "No previous token was found (or could be used). Please enter your google-username and -password to authenticate."
-    #    username = raw_input('Username: ')
-    #    passwd = getpass.getpass()
+
     try:
         docsservice.ClientLogin(username, passwd, source="Python Google Docs Backup")
         spreadsheetservice.ClientLogin(username, passwd, source="Python Google Docs Backup")
@@ -125,7 +125,9 @@ if verbose:
 endings = {
         'document': 'odt',
         'spreadsheet': 'ods',
-        'pdf': 'pdf'
+        'pdf': 'pdf',
+        'drawing': 'svg',
+        'file': '',
         }
 
 for entry in alldocuments:
@@ -152,10 +154,10 @@ for entry in alldocuments:
     #print ' Type is %s' % entry.GetDocumentType()
 
     pathdir = os.path.join(backupdir, parentdir)
-    ending='html'
+    ending=''
     if entry.GetDocumentType() in endings:
-        ending = endings[entry.GetDocumentType()]
-    filename = os.path.join(pathdir, hidden + entry.title.text + '.' + ending)
+        ending = '.'+endings[entry.GetDocumentType()]
+    filename = os.path.join(pathdir, hidden + entry.title.text + ending)
 
 
     published = datetime.datetime.strptime(entry.published.text.split('.')[0], '%Y-%m-%dT%H:%M:%S')
@@ -173,7 +175,7 @@ for entry in alldocuments:
             docstoken = docsservice.GetClientLoginToken()
             docsservice.SetClientLoginToken(spreadsheetservice.GetClientLoginToken())
             try:
-                docsservice.Download(entry, filename, ending)
+                downloadfile(docsservice, entry, filename, ending)
             except Exception, e:
                 print 'Exception: ', e
             finally:
@@ -183,11 +185,9 @@ for entry in alldocuments:
             # Anything else will just work with the normal docservice auth-token
             #
             try:
-                docsservice.Download(entry, filename, ending)
+                downloadfile(docsservice, entry, filename, ending)
             except Exception, e:
                 print 'Exception: ', e
-        modtime = time.mktime(updated.timetuple())
-        os.utime(filename, (int(time.time()), int(modtime)))
 
 config.set('googlebackup', 'lastrun', datetime.datetime.now().isoformat('T'))
 
