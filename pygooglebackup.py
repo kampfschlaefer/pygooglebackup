@@ -156,8 +156,8 @@ for entry in alldocuments:
     pathdir = os.path.join(backupdir, parentdir)
     ending=''
     if entry.GetDocumentType() in endings:
-        ending = '.'+endings[entry.GetDocumentType()]
-    filename = os.path.join(pathdir, hidden + entry.title.text + ending)
+        ending = endings[entry.GetDocumentType()]
+    filename = os.path.join(pathdir, hidden + entry.title.text + '.' + ending)
 
 
     published = datetime.datetime.strptime(entry.published.text.split('.')[0], '%Y-%m-%dT%H:%M:%S')
